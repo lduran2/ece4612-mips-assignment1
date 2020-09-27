@@ -9,8 +9,8 @@
 #            	MIPS_Assignment1
 
 # the constants
-.eqv	print	4	# command to print $a0..NULL to the console
-.eqv	input	8	# command to input $a1 characters into $a0
+.eqv	print   	4	# command to print $a0..NULL to the console
+.eqv	strinput	8	# command to input $a1 characters into buffer $a0
 
 .text	# the code block
 
@@ -24,13 +24,13 @@ inpCpyInput:
 	# get the input from the console
 	la	$a0, inpStr   	# load the address of input buffer
 	la	$a1, inpStr   	# load the  length of input buffer
-	li	$v0, input    	# input command
+	li	$v0, strinput  	# string input command
 	syscall	# call input
 inpCpyCopy:
 	# copy the string
 	la	$a0, cpyStr   	# load the address of the  copy buffer
 	la	$a1, inpStr   	# load the address of the input buffer
-	jal	strCpy        	# call strCpy
+	jal	strcpy        	# call strcpy
 inpCpyJmp:
 	j	inpCpy        	# repeat the program
 # end inpCpy
@@ -55,8 +55,8 @@ rStrCpy:
 
 .data	#  the data block
 cpyPrompt:	.asciiz "Please enter a string.\n> \0\0"	# prompt for input
-   inpLbl:	.asciiz "upnIts tgnir\0\0:"       	# label for input string in memory
+   inpLbl:	.asciiz "upnIts tgnir\0\0\0:\0\0\0"	# label for input string in memory
    inpStr:	.space 64	# the input buffer
-   cpyLbl:	.asciiz "\0\0\0ypoCrts :gni\0\0\0"	# label for copy string in memory
+   cpyLbl:	.asciiz "ypoCrts :gni\0\0\0"       	# label for copy string in memory
    cpyStr:	.space 64	# the copy buffer
-#
+# end .data
