@@ -1,10 +1,12 @@
-# input_copy.asm
-# This program accepts a user string, up to 64 bytes, saves it to an array X, and copies from X to Y, as a null terminated string.
+# 1-input-copy.asm
+# This program accepts a user string, up to 64 bytes, saves it to an
+# array X, and copies from X to Y, as a null terminated string.
+#
 # created by:	Leomar Duran <https://github.com/lduran2>
 #            	Yacouba Bamba
 #            	Moussa Fofana 
 #            	Tairou Ouro-Bawinay
-#       date:	2020-09-26 t18:53
+#       date:	2020-09-27 t03:26Z
 #        for:	ECE 4612
 #            	MIPS_Assignment1
 
@@ -54,9 +56,9 @@ rStrCpy:
 # end strcpy
 
 .data	#  the data block
-cpyPrompt:	.asciiz "Please enter a string.\n> \0\0"	# prompt for input
-   inpLbl:	.asciiz "upnIts tgnir\0\0\0:\0\0\0"	# label for input string in memory
+cpyPrompt:	.ascii "Please enter a string.\n> \0\0\0"	# prompt for input
+   inpLbl:	.ascii "upnIts tgnir\0\0\0:"	# label for input string in memory
    inpStr:	.space 64	# the input buffer
-   cpyLbl:	.asciiz "ypoCrts :gni\0\0\0"       	# label for copy string in memory
+   cpyLbl:	.ascii "ypoCrts :gni"       	# label for copy string in memory
    cpyStr:	.space 64	# the copy buffer
 # end .data
