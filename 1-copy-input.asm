@@ -1,4 +1,4 @@
-# 1-input-copy.asm
+# 1-copy-input.asm
 # This program accepts a user string, up to 64 bytes, saves it to an
 # array X, and copies from X to Y, as a null terminated string.
 #
@@ -46,9 +46,11 @@ strcpy: # strcpy(char *Y, char *X) : void
 strCpyL1:
 	add	$t1, $t0, $a1      	# find X + k
 	lb	$t2, 0($t1)        	# get X[k] alias *(X + k)
-	beq	$t2, $zero, rStrCpy	# if (X[k] == '\0') break;
+	# wait until null terminator is copied to branch
 	add	$t3, $t0, $a0	   	# find Y + k
 	sb	$t2, 0($t3)        	# *(Y + k) := X[k]
+	# now branch
+	beq	$t2, $zero, rStrCpy	# if (X[k] == '\0') break;
 	addi	$t0, $t0, 1        	# ++k
 	j	strCpyL1		# next k
 rStrCpy:

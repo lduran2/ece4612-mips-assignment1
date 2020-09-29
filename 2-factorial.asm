@@ -6,7 +6,7 @@
 #            	Yacouba Bamba
 #            	Moussa Fofana 
 #            	Tairou Ouro-Bawinay
-#       date:	2020-09-27 t03:26Z
+#       date:	2020-09-28 t19:56Z
 #        for:	ECE 4612
 #            	MIPS_Assignment1
 
@@ -32,7 +32,7 @@ inpFctFactorial:
 inpFctFactorialStore:
 	move	$s0, $v0       	# store the factorial
 inpFctOutputLabel:
-	la	$a0, ansLabel  	# load the address of the answer label
+	la	$a0, ansPrompt 	# load the address of the answer label
 	la	$v0, print     	# print command
 	syscall	# call print the label
 inpFctOutputNumber:
@@ -48,19 +48,18 @@ inpFctJmp:
 # end inpFct
 
 factorial:	# factorial n
-	addi	$v0, $zero, 1	# return one
+	addi	$v0, $zero, 1         	# f := 1
 factorialL1:
-	beq	$a0, $zero, rFactorial
-	multu	$v0, $a0
-	mflo	$v0
-	mfhi	$v1
-	addi	$a0, $a0, -1
-	j	factorialL1
+	beq	$a0, $zero, rFactorial	# branch out if ran out of numbers to multiply
+	multu	$v0, $a0              	# f *= n
+	mfhi	$v1                   	# v1:v0 = f
+	mflo	$v0                   	#   "     "
+	addi	$a0, $a0, -1          	# --n
+	j	factorialL1           	# repeat
 rFactorial:
-	jr	$ra
+	jr	$ra                   	# return to caller	
 #
 
 .data	# the data block
 factPrompt:	.ascii "Enter a number to find factorial: \0\0"	# prompt for factorial
-  ansLabel:	.ascii "Ans: \0\0\0"	# label for answer
-
+ ansPrompt:	.ascii "Ans: \0\0\0"	# label for answer
