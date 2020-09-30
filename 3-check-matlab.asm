@@ -5,14 +5,17 @@
 #            	Yacouba Bamba
 #            	Moussa Fofana 
 #            	Tairou Ouro-Bawinay
-#       date:	2020-09-28 t22:17Z
+#       date:	2020-09-30 t03:34Z
 #        for:	ECE 4612
 #            	MIPS_Assignment1
-#    version:	1.2
+#    version:	1.3
 ######################################################################
 #
 # ChangeLog
 ######################################################################
+# 	v1.3 - 2020-09-30 t03:34Z
+# 		Implemented the "no operators since" flags.
+#
 # 	v1.2 - 2020-09-30 t02:37Z
 # 		Implemented even parentheses cheaker.
 #
@@ -27,8 +30,10 @@
 .eqv	chrprint	11	# command to print character &a0
 # number constants
 .eqv	lastchar	63	# index of last character in strinput
-.eqv	parenError	64	# flags uneven parentheses
-.eqv	parenErrShf	6	# shifts 
+# flag masks
+.eqv	flParError	64	# flags uneven parentheses
+.eqv	flOpndOptr	1	# flags no operator since operand
+.eqv	flClPrOptr	2	# flags no operator since closed parenthesis
 
 .text	# the code block
 
@@ -63,7 +68,7 @@ inpChkInvalid:
 	andi	$a0, $s0, lastchar       	#  copy line number to print
 	addi	$v0, $zero, intprint     	# print line number
 	syscall	# print the line number
-	andi	$a0, $s0, parenError     	# copy the parentheses error
+	andi	$a0, $s0, flParError     	# copy the parentheses error
 	bne	$a0, $zero, inpChkInvPar  	# branch if parentheses error
 	j	inpChkOutput             	# finish the loop
 inpChkInvPar:
@@ -95,21 +100,19 @@ inpChkOutput:
 #   no operator between close parenthesis and operand
 #   syntax errors:
 #     (/
+#     //
+#     +/
+#     -/
+#     */
 #     (*
+#     /*
+#     +*
+#     -*
+#     **
 #     ()
 #     /)
-#     //
-#     /*
-#     +/
-#     +*
 #     +)
-#     -/
-#     -*
 #     -)
-#     **
-#     */
-#     *)
-#     */
 #     *)
 #
 # params:
@@ -122,9 +125,11 @@ matchk: # matchk(char *X) : void
 	# $t4 := character, temporary load
 	# $t5 := counter, i_parentheses
 	#                 of open parentheses - close parentheses
+	# $t6 := flags for operator between
 	add	$v1, $zero, $zero     	# clear $v1
 	add	$t0, $zero, $zero       # for k = 0,
 	add	$t5, $zero, $zero       # i_parentheses = 0
+	add	$t6, $zero, $zero      	# clear operator between flags
 matChkL1:
 	add	$t1, $t0, $a1           # find X + k
 	lb	$t2, 0($t1)             # get X[k] alias *(X + k)
@@ -136,7 +141,7 @@ matChkChVal:	# character is valid
 	addi	$t0, $t0, 1            	# ++k
 	j	matChkL1               	# next k
 matChkUePar:	# Uneven parentheses
-	ori	$v1, $v1, parenError   	# set the parenError flag
+	ori	$v1, $v1, flParError   	# set the flParError flag
 	j	matChkInval            	# uneven parentheses are invalid
 matChkInval:	# string is not valid
 	add	$v0, $zero, $zero      	# clear valid flag
@@ -154,53 +159,70 @@ rMatChk:
 #   characters allowed [(-+\-/-9=A-Za-z]
 #    , after +, : after 9, [ after Z, { after z
 matChkCharRng:
-matChkCharR10:	# character range 10 [()*+]
+matChkCharR10:	# character range 10 [(-+]
 	addi	$t4, $zero, '('        	# load '('
 	beq	$t2, $t4, matChkOpPar  	# if (X[k] == '(')  open parenthesis;
 	addi	$t4, $zero, ')'        	# load ')'
 	beq	$t2, $t4, matChkClPar  	# if (X[k] == ')') close parenthesis;
 	addi	$t4, $zero, '*'        	# load '*'
-	beq	$t2, $t4, matChkChVal  	# if (X[k] == '*') valid character;
+	beq	$t2, $t4, matChkOptr   	# if (X[k] == '*') operator;
 	addi	$t4, $zero, '+'        	# load '+'
-	beq	$t2, $t4, matChkChVal  	# if (X[k] == '+') valid character;
+	beq	$t2, $t4, matChkOptr   	# if (X[k] == '+') operator;
 matChkCharMns:	# character -
 	addi	$t4, $zero, '-'        	# load '-'
-	beq	$t2, $t4, matChkChVal  	# if (X[k] == '-') valid character;
+	beq	$t2, $t4, matChkOptr   	# if (X[k] == '-') operator;
 matChkCharR20:	# character round 20 [/-9]
-	sltiu	$t3, $t2, '/'          	# if (X[k] < '/')
+	addi	$t4, $zero, '/'        	# load '/'
+	beq	$t2, $t4, matChkOptr   	# if (X[k] == '/') operator;
+	sltiu	$t3, $t2, '0'          	# if (X[k] < '0')
 	bne	$t3, $zero, matChkInval	#   invalid string;
 	sltiu	$t3, $t2, ':'	       	# if (X[k] <= '9')
-	bne	$t3, $zero, matChkChVal	#   valid character;
+	bne	$t3, $zero, matChkOpnd 	#   operand;
 matChkCharEqu:	# character =
 	addi	$t4, $zero, '='        	# load '='
-	beq	$t2, $t4, matChkChVal  	# if (X[k] == '=') valid character;
+	beq	$t2, $t4, matChkOptr   	# if (X[k] == '=') operator;
 matChkCharR30:	# character round 30 [A-Z]
 	sltiu	$t3, $t2, 'A'          	# if (X[k] < 'A')
 	bne	$t3, $zero, matChkInval	#   invalid string;
 	sltiu	$t3, $t2, '['	       	# if (X[k] <= 'Z')
-	bne	$t3, $zero, matChkChVal	#   valid character;
+	bne	$t3, $zero, matChkOpnd 	#   operand;
 matChkCharR40:	# character round 40 [a-z]
 	sltiu	$t3, $t2, 'a'          	# if (X[k] < 'a')
 	bne	$t3, $zero, matChkInval	#   invalid string;
 	sltiu	$t3, $t2, '{'	       	# if (X[k] <= 'z')
-	bne	$t3, $zero, matChkChVal	#   valid character;
+	bne	$t3, $zero, matChkOpnd 	#   operand;
 	j	matChkInval            	# else invalid string;
 #
 
 ######################################################################
 # # Matlab check: parentheses
 matChkOpPar:	# character is an open parenthesis
+	andi	$t3, $t6, flOpndOptr   	# if (no operator since last operand)
+	bne	$t3, $zero, matChkInval	#   invalid string;
 	addi	$t5, $t5, 1            	# ++i_parentheses
 	j	matChkChVal            	#  open parenthesis is valid
 matChkClPar:	# character is a close parenthesis
 	addi	$t5, $t5, -1           	# --i_parentheses
+	ori	$t6, $t6, flClPrOptr   	# flag no operator since last closed parenthesis
 	j	matChkChVal            	# close parenthesis is valid
 #
+
+######################################################################
+# # Matlab check: character classes
+matChkOptr:	# character is an operator
+	add	$t6, $zero, $zero   	# clear both flags
+	j	matChkChVal	    	# operator is valid
+matChkOpnd:	# character is an operand
+	andi	$t3, $t6, flClPrOptr   	# if (no operator since last close parenthesis)
+	bne	$t3, $zero, matChkInval	#   invalid string;
+	ori	$t6, $t6, flOpndOptr   	# flag no operator since last operand
+	j	matChkChVal	    	# operand is valid
+#	
 
 .data	#  the data block
  matPrompt:	.ascii ">>>\0"	# prompt for input
     inpStr:	.space 64	# the input buffer
 invMessage:	.ascii "Invalid input at: \0\0"	# output for invalid input
 valMessage:	.ascii "Valid input\0"      	# the input buffer
- parErrMsg:	.ascii "Uneven parentheses\0\0"	# c.f., parenError
+ parErrMsg:	.ascii "Uneven parentheses\0\0"	# c.f., flParError
 # end .data
