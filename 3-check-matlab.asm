@@ -5,14 +5,17 @@
 #            	Yacouba Bamba
 #            	Moussa Fofana 
 #            	Tairou Ouro-Bawinay
-#       date:	2020-09-30 t03:34Z
+#       date:	2020-09-30 t07:44Z
 #        for:	ECE 4612
 #            	MIPS_Assignment1
-#    version:	1.3
+#    version:	1.4
 ######################################################################
 #
 # ChangeLog
 ######################################################################
+# 	v1.4 - 2020-09-30 t07:44Z
+# 		Implemented the error from digraph ends.
+#
 # 	v1.3 - 2020-09-30 t03:34Z
 # 		Implemented the "no operators since" flags.
 #
@@ -120,17 +123,23 @@ inpChkOutput:
 matchk: # matchk(char *X) : void
 	# $t0 := index, k
 	# $t1 := address, (X + k)
+	#                 or used in digraphs to store $ra temporarily
 	# $t2 := character, X[k]
-	# $t3 := boolean, if (X[k] < some character)
+	# $t3 := boolean, used in if statements for range,
+	#                 in "no operators since",
+	#                 or at error digraph end
 	# $t4 := character, temporary load
 	# $t5 := counter, i_parentheses
 	#                 of open parentheses - close parentheses
 	# $t6 := flags for operator between
+	# $t7 := previous character
 	add	$v1, $zero, $zero     	# clear $v1
 	add	$t0, $zero, $zero       # for k = 0,
+	add	$t2, $zero, $zero      	# clear X[k]
 	add	$t5, $zero, $zero       # i_parentheses = 0
 	add	$t6, $zero, $zero      	# clear operator between flags
 matChkL1:
+	add	$t7, $zero, $t2        	# save previous character
 	add	$t1, $t0, $a1           # find X + k
 	lb	$t2, 0($t1)             # get X[k] alias *(X + k)
 	beq	$t2, $zero, matChkValid	# if (end of string), then valid
@@ -151,7 +160,7 @@ matChkValid:
 	bne	$t5, $zero, matChkUePar	# invalid if parentheses uneven
 	addi	$v0, $zero, 1          	#   set valid flag
 rMatChk:
-	jr	$ra                    	# return to caller
+	jr	$ra        	# return to caller
 # end matchk
 
 ######################################################################
@@ -165,7 +174,7 @@ matChkCharR10:	# character range 10 [(-+]
 	addi	$t4, $zero, ')'        	# load ')'
 	beq	$t2, $t4, matChkClPar  	# if (X[k] == ')') close parenthesis;
 	addi	$t4, $zero, '*'        	# load '*'
-	beq	$t2, $t4, matChkOptr   	# if (X[k] == '*') operator;
+	beq	$t2, $t4, matChkSlAs   	# if (X[k] == '*') slash or asterisk;
 	addi	$t4, $zero, '+'        	# load '+'
 	beq	$t2, $t4, matChkOptr   	# if (X[k] == '+') operator;
 matChkCharMns:	# character -
@@ -173,7 +182,7 @@ matChkCharMns:	# character -
 	beq	$t2, $t4, matChkOptr   	# if (X[k] == '-') operator;
 matChkCharR20:	# character round 20 [/-9]
 	addi	$t4, $zero, '/'        	# load '/'
-	beq	$t2, $t4, matChkOptr   	# if (X[k] == '/') operator;
+	beq	$t2, $t4, matChkSlAs   	# if (X[k] == '/') slash or asterisk;
 	sltiu	$t3, $t2, '0'          	# if (X[k] < '0')
 	bne	$t3, $zero, matChkInval	#   invalid string;
 	sltiu	$t3, $t2, ':'	       	# if (X[k] <= '9')
@@ -195,20 +204,25 @@ matChkCharR40:	# character round 40 [a-z]
 #
 
 ######################################################################
-# # Matlab check: parentheses
+# Matlab check: parentheses
 matChkOpPar:	# character is an open parenthesis
 	andi	$t3, $t6, flOpndOptr   	# if (no operator since last operand)
 	bne	$t3, $zero, matChkInval	#   invalid string;
 	addi	$t5, $t5, 1            	# ++i_parentheses
 	j	matChkChVal            	#  open parenthesis is valid
 matChkClPar:	# character is a close parenthesis
+	# backup $ra before calling
+	add	$t1, $zero, $ra	# backup $ra
+	jal	matChkDgrp     	# check if character is a error digraph end
+	add	$ra, $zero, $t1	# restore $ra
+	bne	$t3, $zero, matChkInval	# if (error from end) invalid string
 	addi	$t5, $t5, -1           	# --i_parentheses
 	ori	$t6, $t6, flClPrOptr   	# flag no operator since last closed parenthesis
-	j	matChkChVal            	# close parenthesis is valid
+	j	matChkDgrp            	# check if character is a error digraph end
 #
 
 ######################################################################
-# # Matlab check: character classes
+# Matlab check: character classes
 matChkOptr:	# character is an operator
 	add	$t6, $zero, $zero   	# clear both flags
 	j	matChkChVal	    	# operator is valid
@@ -217,7 +231,36 @@ matChkOpnd:	# character is an operand
 	bne	$t3, $zero, matChkInval	#   invalid string;
 	ori	$t6, $t6, flOpndOptr   	# flag no operator since last operand
 	j	matChkChVal	    	# operand is valid
-#	
+#
+
+######################################################################
+# Matlab check: error digraph end characters	[(/+\-*]
+matChkDgrp:	# check if character is a error digraph end
+	# cannot jump out of matChkDgrp other than through: jr $ra
+	add	$t3, $zero, $zero   	# clear error from end
+	addi	$t4, $zero, '('        	# load '('
+	beq	$t7, $t4, matChkDgEr   	# if (X[k-1] == '(') error from end
+	addi	$t4, $zero, '/'        	# load '/'
+	beq	$t7, $t4, matChkDgEr   	# if (X[k-1] == '/') error from end
+	addi	$t4, $zero, '+'        	# load '+'
+	beq	$t7, $t4, matChkDgEr   	# if (X[k-1] == '+') error from end
+	addi	$t4, $zero, '-'        	# load '-'
+	beq	$t7, $t4, matChkDgEr   	# if (X[k-1] == '-') error from end
+	addi	$t4, $zero, '*'        	# load '*'
+	beq	$t7, $t4, matChkDgEr   	# if (X[k-1] == '*') error from end
+matChkDgOt:
+	jr	$ra          	# return to caller
+matChkDgEr:	# error from error diagraph end
+	addi	$t3, $zero, 1	# set error from end
+	j	matChkDgOt   	# finish
+matChkSlAs:	# character is a slash or asterisk
+	# backup $ra before calling
+	add	$t1, $zero, $ra	# backup $ra
+	jal	matChkDgrp     	# check if character is a error digraph end
+	add	$ra, $zero, $t1	# restore $ra
+	bne	$t3, $zero, matChkInval	# if (error from end) invalid string
+	j	matChkOptr	# slash is an operator
+#
 
 .data	#  the data block
  matPrompt:	.ascii ">>>\0"	# prompt for input
