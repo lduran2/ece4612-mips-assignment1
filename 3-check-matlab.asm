@@ -27,14 +27,10 @@
 ######################################################################
 
 # command constants
-.eqv	intprint   	1	# command to print integer $a0
 .eqv	print   	4	# command to print $a0..NULL to the console
 .eqv	strinput	8	# command to input $a1 characters into buffer $a0
 .eqv	chrprint	11	# command to print character &a0
-# number constants
-.eqv	lastchar	63	# index of last character in strinput
 # flag masks
-.eqv	flParError	64	# flags uneven parentheses
 .eqv	flOpndOptr	1	# flags no operator since operand
 .eqv	flClPrOptr	2	# flags no operator since closed parenthesis
 
@@ -58,31 +54,13 @@ inpChkValidate:
 	jal	matchk                   	# call matchk
 	beq	$v0, $zero, inpChkInvalid	# if (valid string)
 	la	$a0, valMessage          	# load address of valid message
-	la	$a1, valMessage          	# load  length of valid message
-	addi	$v0, $zero, print        	# print command
-	syscall	# print the message
 	j	inpChkOutput             	# finish the loop
 inpChkInvalid:
 	la	$a0, invMessage          	# load address of invalid message
-	addi	$v0, $zero, print        	# print command
-	syscall	# print the message
-	la	$a1, invMessage          	# load  length of invalid message
-	add	$s0, $v1, $zero          	#  copy the error information
-	andi	$a0, $s0, lastchar       	#  copy line number to print
-	addi	$v0, $zero, intprint     	# print line number
-	syscall	# print the line number
-	andi	$a0, $s0, flParError     	# copy the parentheses error
-	bne	$a0, $zero, inpChkInvPar  	# branch if parentheses error
-	j	inpChkOutput             	# finish the loop
-inpChkInvPar:
-	addi	$a0, $zero, '\n'         	#  load newline
-	addi	$v0, $zero, chrprint     	# print newline
-	syscall	# print newline
-	la	$a0, parErrMsg           	# load address of parentheses error message
-	addi	$v0, $zero, print        	# print command
-	syscall	# print the message
 	j	inpChkOutput             	# finish the loop
 inpChkOutput:
+	addi	$v0, $zero, print        	# print command
+	syscall	# print the message
 	addi	$a0, $zero, '\n'         	#  load newline
 	addi	$v0, $zero, chrprint     	# print newline
 	syscall	# print newline
@@ -149,15 +127,12 @@ matChkL1:
 matChkChVal:	# character is valid
 	addi	$t0, $t0, 1            	# ++k
 	j	matChkL1               	# next k
-matChkUePar:	# Uneven parentheses
-	ori	$v1, $v1, flParError   	# set the flParError flag
-	j	matChkInval            	# uneven parentheses are invalid
 matChkInval:	# string is not valid
 	add	$v0, $zero, $zero      	# clear valid flag
 	or	$v1, $v1, $t0          	# $v1 |= k
 	j	rMatChk                	# finish
 matChkValid:
-	bne	$t5, $zero, matChkUePar	# invalid if parentheses uneven
+	bne	$t5, $zero, matChkInval	# invalid if parentheses uneven
 	addi	$v0, $zero, 1          	#   set valid flag
 rMatChk:
 	jr	$ra        	# return to caller
@@ -265,7 +240,6 @@ matChkSlAs:	# character is a slash or asterisk
 .data	#  the data block
  matPrompt:	.ascii ">>>\0"	# prompt for input
     inpStr:	.space 64	# the input buffer
-invMessage:	.ascii "Invalid input at: \0\0"	# output for invalid input
+invMessage:	.ascii "Invalid input\0\0\0"	# output for invalid input, non-verbose format
 valMessage:	.ascii "Valid input\0"      	# the input buffer
- parErrMsg:	.ascii "Uneven parentheses\0\0"	# c.f., flParError
 # end .data
